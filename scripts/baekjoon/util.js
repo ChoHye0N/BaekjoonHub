@@ -147,6 +147,35 @@ function insertUploadAllButton() {
   });
   li.appendChild(btn);
   navTabs.appendChild(li);
+
+  // 로컬 백업 버튼
+  insertLocalBackupButton();
+}
+
+/**
+ * (임시 코드)
+ * 프로필 페이지의 nav-tabs에 "로컬 ZIP 백업" 버튼을 삽입함.
+ */
+function insertLocalBackupButton() {
+  const navTabs = document.querySelector('ul.nav.nav-tabs');
+  if (!navTabs || document.getElementById('bjh-local-backup-btn')) return;
+
+  const li = document.createElement('li');
+  li.id = 'bjh-local-backup-btn';
+  const btn = document.createElement('a');
+  btn.innerHTML = '로컬 ZIP 백업';
+  btn.style.cursor = 'pointer';
+  btn.style.color = '#e67e22';
+
+  btn.addEventListener('click', () => {
+    if (confirm('전체 문제를 ZIP 파일로 로컬에 백업하시겠습니까?')) {
+      insertMultiLoader();
+      backupAllSolvedProblemToZip();
+    }
+  });
+
+  li.appendChild(btn);
+  navTabs.appendChild(li);
 }
 
 /**

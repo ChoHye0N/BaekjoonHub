@@ -111,6 +111,70 @@ async function uploadAllSolvedProblem() {
   }
 }
 
+/**
+ * (임시 코드)
+ * 프로필 페이지에서 맞은 문제 전체를 수집 및 로컬 다운로드함.
+ */
+async function backupAllSolvedProblemToZip() {
+  const zip = new JSZip();
+  let successCount = 0;
+  let failedProblemIds = [];
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  
+  try {
+    const username = findUsername();
+    if (!username) return;
+
+    const list = await findUniqueResultTableListByUsername(username);
+    if (!list || list.length === 0) {
+      alert("백업할 문제가 없습니다.");
+      return;
+    }
+
+    console.log(`[로컬 백업] 시작: 총 ${list.length}개 문제`);
+    setMultiLoaderDenom(list.length);
+    const saveExamples = await getSaveExamplesOption();
+
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      console.log(`[${i+1}/${list.length}] ${item.problemId}번 분석 중...`);
+
+      try {
+        // 에러 방지용 재시도 로직 포함 호출
+        const dataArray = await findDatas([item]); 
+        const bojData = dataArray[0];
+
+        if (bojData && bojData.code) {
+          const folder = zip.folder(bojData.directory);
+          folder.file(bojData.fileName, bojData.code);
+          folder.file("README.md", bojData.readme);
+
+          if (saveExamples && bojData.samples) {
+            const fileEntries = samplesToFileEntries(bojData.samples);
+            fileEntries.forEach(e => folder.file(e.filename, e.content));
+          }
+          successCount++;
+        }
+      } catch (e) {
+        console.error(`${item.problemId}번 실패:`, e.message);
+        failedProblemIds.push(item.problemId);
+      }
+
+      incMultiLoader(1);
+      await sleep(400);
+    }
+
+    if (failedProblemIds.length > 0) zip.file("실패목록.txt", failedProblemIds.join("\n"));
+    
+    const content = await zip.generateAsync({ type: "blob" });
+    saveAs(content, `백준_로컬백업_${new Date().toISOString().slice(0,10)}.zip`);
+    MultiloaderSuccess();
+    alert(`백업 완료 (성공: ${successCount}, 실패: ${failedProblemIds.length})`);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 /** Github api를 사용하여 업로드를 합니다.
  * @see https://docs.github.com/en/rest/reference/repos#create-or-update-file-contents
  * @param {string} token - github api 토큰
