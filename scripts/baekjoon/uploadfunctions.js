@@ -114,12 +114,12 @@ async function uploadAllSolvedProblem() {
 /**
  * (임시 코드)
  * 프로필 페이지에서 맞은 문제 전체를 수집 및 로컬 다운로드함.
+ * 백준 서버 불안정할 때 사용하려고 만듦
  */
 async function backupAllSolvedProblemToZip() {
   const zip = new JSZip();
   let successCount = 0;
   let failedProblemIds = [];
-  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   
   try {
     const username = findUsername();
@@ -135,12 +135,9 @@ async function backupAllSolvedProblemToZip() {
     setMultiLoaderDenom(list.length);
     const saveExamples = await getSaveExamplesOption();
 
-    for (let i = 0; i < list.length; i++) {
-      const item = list[i];
-      console.log(`[${i+1}/${list.length}] ${item.problemId}번 분석 중...`);
-
+    await asyncPool(2, list, async (item) => {
       try {
-        // 에러 방지용 재시도 로직 포함 호출
+        // 문제 데이터 가져오기
         const dataArray = await findDatas([item]); 
         const bojData = dataArray[0];
 
@@ -158,16 +155,17 @@ async function backupAllSolvedProblemToZip() {
       } catch (e) {
         console.error(`${item.problemId}번 실패:`, e.message);
         failedProblemIds.push(item.problemId);
+      } finally {
+        // 한 문제가 끝날 때마다 업데이트
+        incMultiLoader(1);
       }
-
-      incMultiLoader(1);
-      await sleep(400);
-    }
+    });
 
     if (failedProblemIds.length > 0) zip.file("실패목록.txt", failedProblemIds.join("\n"));
     
     const content = await zip.generateAsync({ type: "blob" });
     saveAs(content, `백준_로컬백업_${new Date().toISOString().slice(0,10)}.zip`);
+
     MultiloaderSuccess();
     alert(`백업 완료 (성공: ${successCount}, 실패: ${failedProblemIds.length})`);
   } catch (err) {
